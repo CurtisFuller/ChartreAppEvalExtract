@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """
 Charter School Evaluation Comments Compiler - Plain Text Version
-Extracts reviewer comments from plain text exports of Word documents.
+Extracts reviewer comments from Word documents by converting to plain text.
+Accepts both .txt files and .docx files (auto-converts .docx to text).
 This is much more reliable than parsing Word XML structures.
 """
 
@@ -11,6 +12,12 @@ import re
 from pathlib import Path
 from collections import defaultdict
 from typing import Dict, List, Set, Tuple
+
+try:
+    from docx import Document
+    DOCX_AVAILABLE = True
+except ImportError:
+    DOCX_AVAILABLE = False
 
 
 # Section lists for different application types
@@ -85,6 +92,54 @@ SECTION_LISTS = {
 }
 
 
+def extract_text_from_docx(docx_path: Path) -> str:
+    """
+    Extract all text from a Word document, similar to 'Save As Plain Text'.
+    Preserves basic structure with tabs between table cells.
+    """
+    if not DOCX_AVAILABLE:
+        raise ImportError("python-docx library is required to process .docx files. Install with: pip install python-docx")
+
+    try:
+        doc = Document(docx_path)
+        text_parts = []
+
+        # Extract all paragraphs and tables in document order
+        for element in doc.element.body:
+            # Check if it's a paragraph
+            if element.tag.endswith('p'):
+                # Find the paragraph object
+                for para in doc.paragraphs:
+                    if para._element == element:
+                        para_text = para.text.strip()
+                        if para_text:
+                            text_parts.append(para_text)
+                        break
+
+            # Check if it's a table
+            elif element.tag.endswith('tbl'):
+                # Find the table object
+                for table in doc.tables:
+                    if table._element == element:
+                        # Extract table content with tabs between cells
+                        for row in table.rows:
+                            row_cells = []
+                            for cell in row.cells:
+                                # Get all text from the cell
+                                cell_text = cell.text.strip()
+                                row_cells.append(cell_text)
+
+                            # Join cells with tabs (similar to plain text export)
+                            if any(row_cells):  # Only add non-empty rows
+                                text_parts.append('\t'.join(row_cells))
+                        break
+
+        return '\n'.join(text_parts)
+
+    except Exception as e:
+        raise Exception(f"Error extracting text from {docx_path.name}: {e}")
+
+
 class BoilerplateFilter:
     """Manages boilerplate text filtering."""
 
@@ -93,12 +148,21 @@ class BoilerplateFilter:
         self.boilerplate_lines: Set[str] = set()
 
     def load_templates(self, template_folder: Path) -> int:
-        """Load all template text files and extract boilerplate text."""
-        template_files = list(template_folder.glob('*.txt'))
+        """Load all template files (.txt or .docx) and extract boilerplate text."""
+        txt_files = list(template_folder.glob('*.txt'))
+        docx_files = [f for f in template_folder.glob('*.docx') if not f.name.startswith('~$')]
+        template_files = txt_files + docx_files
 
         for template_file in template_files:
             try:
-                content = template_file.read_text(encoding='utf-8', errors='ignore')
+                # Get content based on file type
+                if template_file.suffix.lower() == '.docx':
+                    if not DOCX_AVAILABLE:
+                        print(f"  Warning: Skipping {template_file.name} (python-docx not installed)")
+                        continue
+                    content = extract_text_from_docx(template_file)
+                else:
+                    content = template_file.read_text(encoding='utf-8', errors='ignore')
 
                 # Extract all lines
                 for line in content.split('\n'):
@@ -258,12 +322,17 @@ class CommentExtractor:
         return strengths, concerns
 
     def process_document(self, file_path: Path) -> Tuple[int, str, str]:
-        """Process a single plain text evaluation document.
+        """Process a single evaluation document (.txt or .docx).
         Returns: (comment_count, reviewer_name, school_name)
         """
         try:
-            # Read the plain text file
-            content = file_path.read_text(encoding='utf-8', errors='ignore')
+            # Read or extract the text content
+            if file_path.suffix.lower() == '.docx':
+                # Extract text from Word document
+                content = extract_text_from_docx(file_path)
+            else:
+                # Read plain text file
+                content = file_path.read_text(encoding='utf-8', errors='ignore')
 
             # Extract metadata
             reviewer_name = self.extract_reviewer_name(content)
@@ -444,25 +513,46 @@ def main():
     print("Charter School Evaluation Comments Compiler - Plain Text Version")
     print("=" * 66)
     print()
-    print("This version works with plain text (.txt) exports from Word documents.")
-    print("To export: Open Word doc → File → Save As → Plain Text (.txt)")
+    print("This version accepts both .docx and .txt files.")
+    print("Word files (.docx) are automatically converted to text.")
+    print("You can also manually export: File → Save As → Plain Text (.txt)")
     print()
 
     # Prompt for review documents folder
-    review_folder_path = input("Enter path to folder containing plain text review files (.txt): ").strip()
+    review_folder_path = input("Enter path to folder containing review files (.txt or .docx): ").strip()
     review_folder = Path(review_folder_path)
 
     if not review_folder.exists() or not review_folder.is_dir():
         print(f"Error: Folder not found: {review_folder_path}")
         sys.exit(1)
 
+    # Find both .txt and .docx files
     txt_files = [f for f in review_folder.glob('*.txt') if not f.name.startswith('~$')]
+    docx_files = [f for f in review_folder.glob('*.docx') if not f.name.startswith('~$')]
+    all_files = txt_files + docx_files
 
-    if not txt_files:
-        print(f"Error: No .txt files found in {review_folder_path}")
+    if not all_files:
+        print(f"Error: No .txt or .docx files found in {review_folder_path}")
         sys.exit(1)
 
-    print(f"Found {len(txt_files)} .txt file(s)")
+    # Show what we found
+    if txt_files and docx_files:
+        print(f"Found {len(txt_files)} .txt file(s) and {len(docx_files)} .docx file(s)")
+    elif txt_files:
+        print(f"Found {len(txt_files)} .txt file(s)")
+    else:
+        print(f"Found {len(docx_files)} .docx file(s)")
+
+    if docx_files and not DOCX_AVAILABLE:
+        print()
+        print("WARNING: python-docx library not installed.")
+        print("Install with: pip install python-docx")
+        print("Only .txt files will be processed.")
+        all_files = txt_files
+        if not all_files:
+            print("Error: No processable files found")
+            sys.exit(1)
+
     print()
 
     # Prompt for template folder (optional)
@@ -502,11 +592,11 @@ def main():
 
     school_name = None
 
-    for txt_file in txt_files:
-        comment_count, reviewer_name, file_school_name = extractor.process_document(txt_file)
+    for review_file in all_files:
+        comment_count, reviewer_name, file_school_name = extractor.process_document(review_file)
         if not school_name:
             school_name = file_school_name
-        print(f"  ✓ {txt_file.name} - {reviewer_name} ({comment_count} comments extracted)")
+        print(f"  ✓ {review_file.name} - {reviewer_name} ({comment_count} comments extracted)")
 
     if not school_name:
         school_name = "Unknown School"

@@ -14,19 +14,18 @@ A Python command-line tool that extracts reviewer comments from multiple charter
 ## Available Versions
 
 ### 1. **Plain Text Version (RECOMMENDED)** - `charter_review_compiler_plaintext.py`
-This is the most reliable method. It works with plain text exports from Word.
+This is the most reliable method. It automatically extracts text from Word documents.
 
-**How to prepare files:**
-1. Open your Word evaluation document
-2. Go to File → Save As
-3. Choose "Plain Text (*.txt)" as the format
-4. Save with the same naming convention
+**How it works:**
+- Accepts both .docx and .txt files
+- Automatically converts .docx files to plain text internally
+- No manual export needed!
 
 **Advantages:**
-- Works with all Word form field types
-- More reliable parsing
+- Works with all Word form field types (unlike the XML parser)
+- More reliable than parsing complex Word structures
 - Faster processing
-- No complex dependencies
+- Can process .docx files directly (no manual conversion required)
 
 ### 2. **Word Document Version** - `charter_review_compiler.py`
 Works directly with Word files (.docx) but may have issues with certain form field types.
