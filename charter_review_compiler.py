@@ -161,6 +161,27 @@ class CommentExtractor:
         )
         self.boilerplate_filtered_count = 0
 
+    def extract_cell_text(self, cell) -> str:
+        """Extract text from a table cell, including form fields.
+
+        Word form fields may not be captured by cell.text alone,
+        so we also check paragraph content.
+        """
+        # Method 1: Direct cell text (works for most cases)
+        text = cell.text.strip()
+
+        # Method 2: Check all paragraphs in the cell
+        # This can capture form field content that cell.text misses
+        if not text:
+            para_texts = []
+            for para in cell.paragraphs:
+                para_text = para.text.strip()
+                if para_text:
+                    para_texts.append(para_text)
+            text = '\n'.join(para_texts)
+
+        return text
+
     def extract_reviewer_name(self, filename: str) -> str:
         """Extract reviewer name from filename."""
         # Format: SchoolName_Eval_ReviewerName.docx
@@ -208,7 +229,7 @@ class CommentExtractor:
 
         # Check if this is a Type|Reference|Comment format table
         if len(table.rows) > 0 and len(table.rows[0].cells) >= 3:
-            first_row_cells = [cell.text.strip().lower() for cell in table.rows[0].cells]
+            first_row_cells = [self.extract_cell_text(cell).lower() for cell in table.rows[0].cells]
 
             # Check if this is a Type|Reference|Comment header row
             if 'type' in first_row_cells[0] and ('reference' in first_row_cells[1] or 'comment' in ' '.join(first_row_cells)):
@@ -219,7 +240,7 @@ class CommentExtractor:
                     if len(row.cells) < 2:
                         continue
 
-                    cells_text = [cell.text.strip() for cell in row.cells]
+                    cells_text = [self.extract_cell_text(cell) for cell in row.cells]
 
                     # Skip empty rows
                     if not any(cells_text):
@@ -258,7 +279,7 @@ class CommentExtractor:
         current_section = None
 
         for row_idx, row in enumerate(table.rows):
-            cells_text = [cell.text.strip() for cell in row.cells]
+            cells_text = [self.extract_cell_text(cell) for cell in row.cells]
             first_cell = cells_text[0].lower() if cells_text else ''
 
             if 'strength' in first_cell:
@@ -270,7 +291,7 @@ class CommentExtractor:
 
             # Extract content from cells
             for cell_idx, cell in enumerate(row.cells):
-                text = cell.text.strip()
+                text = self.extract_cell_text(cell)
 
                 if not text or self.boilerplate_filter.is_boilerplate(text):
                     continue

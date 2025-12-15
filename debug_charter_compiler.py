@@ -11,6 +11,30 @@ from datetime import datetime
 from docx import Document
 
 
+def extract_text_from_cell(cell):
+    """Extract text from a cell, including form fields."""
+    # Try regular text first
+    text = cell.text.strip()
+
+    # Check for form fields in the cell
+    try:
+        from docx.oxml.ns import qn
+        # Look for form field elements
+        for paragraph in cell.paragraphs:
+            for run in paragraph.runs:
+                # Check for form field in run element
+                elem = run._element
+                for child in elem.iter():
+                    tag = child.tag
+                    if 'ffData' in tag or 'textInput' in tag:
+                        # This indicates a form field
+                        return text, True
+    except:
+        pass
+
+    return text, False
+
+
 def analyze_document(file_path: Path, debug_file, boilerplate_texts=None):
     """Analyze a single Word document and write debug info."""
     debug_file.write(f"\n{'=' * 80}\n")
@@ -46,10 +70,13 @@ def analyze_document(file_path: Path, debug_file, boilerplate_texts=None):
                 debug_file.write(f"\n  [Row {row_idx}] {len(row.cells)} cells:\n")
 
                 for cell_idx, cell in enumerate(row.cells):
-                    text = cell.text.strip()
+                    text, has_form_field = extract_text_from_cell(cell)
 
                     # Show cell content
                     debug_file.write(f"    [Cell {cell_idx}]: ")
+
+                    if has_form_field:
+                        debug_file.write("[FORM FIELD] ")
 
                     if not text:
                         debug_file.write("(EMPTY)\n")
