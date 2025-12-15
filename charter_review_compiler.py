@@ -143,7 +143,8 @@ class BoilerplateFilter:
         if lower_text in ['strengths', 'concerns and additional questions',
                           'concerns', 'reference', 'references',
                           'meets the standard', 'partially meets the standard',
-                          'does not meet the standard']:
+                          'does not meet the standard', 'type', 'comment',
+                          'strength', 'concern', 'question', 'follow up']:
             return True
 
         return False
@@ -196,17 +197,68 @@ class CommentExtractor:
         return None
 
     def parse_table_for_comments(self, table: Table) -> Tuple[List[str], List[str]]:
-        """Parse a table to extract strengths and concerns."""
+        """Parse a table to extract strengths and concerns.
+
+        Handles two formats:
+        1. Type | Reference | Comment (single row with columns)
+        2. Multi-row format with Strengths/Concerns headers
+        """
         strengths = []
         concerns = []
 
+        # Check if this is a Type|Reference|Comment format table
+        if len(table.rows) > 0 and len(table.rows[0].cells) >= 3:
+            first_row_cells = [cell.text.strip().lower() for cell in table.rows[0].cells]
+
+            # Check if this is a Type|Reference|Comment header row
+            if 'type' in first_row_cells[0] and ('reference' in first_row_cells[1] or 'comment' in ' '.join(first_row_cells)):
+                # This is the Type|Reference|Comment format
+                # Process rows after the header
+                for row_idx in range(1, len(table.rows)):
+                    row = table.rows[row_idx]
+                    if len(row.cells) < 2:
+                        continue
+
+                    cells_text = [cell.text.strip() for cell in row.cells]
+
+                    # Skip empty rows
+                    if not any(cells_text):
+                        continue
+
+                    # Get type, reference, and comment
+                    comment_type = cells_text[0].lower() if len(cells_text) > 0 else ''
+                    reference = cells_text[1] if len(cells_text) > 1 else ''
+                    comment = cells_text[2] if len(cells_text) > 2 else cells_text[1] if len(cells_text) > 1 else ''
+
+                    # Skip if comment is empty or boilerplate
+                    if not comment or self.boilerplate_filter.is_boilerplate(comment):
+                        continue
+
+                    # Add page reference if available
+                    comment_text = comment
+                    if reference and not self.boilerplate_filter.is_boilerplate(reference):
+                        # Check if reference looks like a page number
+                        if reference.strip().replace('.', '').replace('p', '').replace(' ', '').isdigit():
+                            # Format as [p. XX]
+                            page_num = reference.strip().replace('p.', '').replace('p', '').strip()
+                            comment_text = f"{comment} [p. {page_num}]"
+                        elif reference and len(reference) < 10:  # Short reference, likely a page number
+                            comment_text = f"{comment} [{reference}]"
+
+                    # Categorize by type
+                    if 'strength' in comment_type:
+                        strengths.append(comment_text)
+                    elif 'concern' in comment_type or 'question' in comment_type:
+                        concerns.append(comment_text)
+                    # Note: "Follow Up" and other types could be added to concerns or a separate category
+
+                return strengths, concerns
+
+        # Fall back to original multi-row format parsing
         current_section = None
 
         for row_idx, row in enumerate(table.rows):
-            # Get cell texts
             cells_text = [cell.text.strip() for cell in row.cells]
-
-            # Check if this is a header row
             first_cell = cells_text[0].lower() if cells_text else ''
 
             if 'strength' in first_cell:
@@ -220,27 +272,18 @@ class CommentExtractor:
             for cell_idx, cell in enumerate(row.cells):
                 text = cell.text.strip()
 
-                # Skip if boilerplate or empty
                 if not text or self.boilerplate_filter.is_boilerplate(text):
                     continue
 
-                # Skip if it looks like a header
                 if text.lower() in ['reference', 'references', 'strengths',
                                    'concerns', 'concerns and additional questions']:
                     continue
 
-                # Extract page references if in last column
                 comment_text = text
                 if cell_idx == len(row.cells) - 1 and cell_idx > 0:
-                    # This might be a reference column, skip it
-                    # But check if it looks like a page number
                     if text.startswith('p.') or text.isdigit():
                         continue
 
-                # Check if comment contains page reference at the end
-                # Format could be [p. 23] or (p. 23) or just p. 23
-
-                # Add to appropriate section
                 if current_section == 'strengths':
                     strengths.append(comment_text)
                 elif current_section == 'concerns':
