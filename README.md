@@ -1,25 +1,48 @@
 # Charter School Evaluation Comments Compiler
 
-A Python command-line tool that extracts reviewer comments from multiple Microsoft Word charter school evaluation documents and compiles them into a single organized Markdown document.
+A Python command-line tool that extracts reviewer comments from multiple charter school evaluation documents and compiles them into a single organized Markdown document.
 
 ## Features
 
-- **Intelligent Document Parsing**: Automatically extracts comments from Word document tables
+- **Intelligent Document Parsing**: Automatically extracts comments from evaluation documents
 - **Boilerplate Filtering**: Removes standard evaluation matrix text using template files
 - **Reviewer Attribution**: Tracks and attributes comments to individual reviewers
 - **Duplicate Removal**: Eliminates exact duplicate comments across reviewers
 - **Flexible Section Support**: Handles three application types (Standard, Virtual, High Performing Replication)
 - **Progress Indicators**: Shows real-time processing status and statistics
 
+## Available Versions
+
+### 1. **Plain Text Version (RECOMMENDED)** - `charter_review_compiler_plaintext.py`
+This is the most reliable method. It works with plain text exports from Word.
+
+**How to prepare files:**
+1. Open your Word evaluation document
+2. Go to File → Save As
+3. Choose "Plain Text (*.txt)" as the format
+4. Save with the same naming convention
+
+**Advantages:**
+- Works with all Word form field types
+- More reliable parsing
+- Faster processing
+- No complex dependencies
+
+### 2. **Word Document Version** - `charter_review_compiler.py`
+Works directly with Word files (.docx) but may have issues with certain form field types.
+
+### 3. **XML Parsing Version** - `charter_review_compiler_v2.py`
+Experimental version that attempts to parse Word XML structures directly.
+
 ## Requirements
 
 - Python 3.7 or higher
-- python-docx library
+- For .docx versions: python-docx library
 
 ## Installation
 
 1. Clone this repository or download the files
-2. Install dependencies:
+2. Install dependencies (only needed for .docx versions):
 
 ```bash
 pip install -r requirements.txt
@@ -27,18 +50,24 @@ pip install -r requirements.txt
 
 ## File Naming Convention
 
-Review documents must follow this naming pattern:
+Review documents should follow this pattern (the script will try to extract names even if the pattern isn't exact):
 ```
-SchoolName_Eval_ReviewerName.docx
+SchoolName_Eval_ReviewerName.docx  (or .txt)
 ```
 
 Examples:
-- `PineappleCove_Eval_JohnSmith.docx`
-- `OaklandAcademy_Eval_JaneDoe.docx`
+- `PineappleCove_Eval_JohnSmith.txt`
+- `OaklandAcademy_Eval_JaneDoe.txt`
 
 ## Usage
 
-Run the script from the command line:
+### Plain Text Version (Recommended)
+
+```bash
+python charter_review_compiler_plaintext.py
+```
+
+### Word Document Version
 
 ```bash
 python charter_review_compiler.py
