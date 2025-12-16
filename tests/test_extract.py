@@ -216,3 +216,31 @@ def test_unchecked_content_control_checkbox_defaults_to_empty_symbol():
 
     assert "☐" in text
     assert "Unchecked content control" in text
+
+
+def test_legacy_text_result_value_stored_as_element_text():
+    table_xml = """
+    <w:tbl>
+      <w:tr>
+        <w:tc>
+          <w:p>
+            <w:r>
+              <w:ffData>
+                <w:textInput>
+                  <w:result>TypedValue</w:result>
+                </w:textInput>
+              </w:ffData>
+            </w:r>
+          </w:p>
+        </w:tc>
+      </w:tr>
+    </w:tbl>
+    """
+    document_xml = DOCUMENT_TEMPLATE.format(content=table_xml)
+
+    with TemporaryDirectory() as tmp:
+        path = Path(tmp) / "legacy_text.docx"
+        _write_docx(path, document_xml)
+        text = extract_docx_text(path)
+
+    assert "TypedValue" in text

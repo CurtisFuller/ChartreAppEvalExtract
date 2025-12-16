@@ -46,10 +46,14 @@ def _legacy_form_value(ff_data: ET.Element) -> str | None:
             val = node.attrib.get(f"{{{W_NS}}}val")
             if val:
                 return val
+            if node.text:
+                return node.text
         if node.tag.endswith("}default"):
             val = node.attrib.get(f"{{{W_NS}}}val")
             if val:
                 return val
+            if node.text:
+                return node.text
     return None
 
 
