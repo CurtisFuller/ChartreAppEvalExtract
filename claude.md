@@ -9,6 +9,7 @@ Create a Python command-line script that extracts reviewer comments from multipl
 - **Review Documents**: Multiple Word (.docx) files in a user-specified folder
 - **Naming Convention**: `SchoolName_Eval_ReviewerName.docx`
   - Example: `PineappleCove_Eval_JohnSmith.docx`
+- **Word Document Form Style**: 
 - **Template Files**: Separate folder containing evaluation matrix template files (for boilerplate text identification)
   - State model template
   - FCI-branded organization template (may have additional text beyond state model)
