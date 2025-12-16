@@ -21,7 +21,21 @@ def _checkbox_state(element) -> str | None:
 
 
 def _legacy_form_value(ff_data: ET.Element) -> str | None:
+    def checkbox_symbol(val: str | None) -> str:
+        if val is None:
+            return "☐"
+        return "☒" if val in {"1", "true", "on", "True"} else "☐"
+
     for node in ff_data.iter():
+        if node.tag.endswith("}checkBox"):
+            checked = None
+            default = None
+            for child in node:
+                if child.tag.endswith("}checked"):
+                    checked = child.attrib.get(f"{{{W_NS}}}val")
+                elif child.tag.endswith("}default"):
+                    default = child.attrib.get(f"{{{W_NS}}}val")
+            return checkbox_symbol(checked if checked is not None else default)
         if node.tag.endswith("}result"):
             val = node.attrib.get(f"{{{W_NS}}}val")
             if val:
