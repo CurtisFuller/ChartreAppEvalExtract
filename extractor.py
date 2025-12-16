@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import argparse
+import sys
 import zipfile
 from pathlib import Path
 from xml.etree import ElementTree as ET
@@ -93,3 +95,37 @@ def extract_docx_text(docx_path: Path | str, output_path: Path | str | None = No
 
 
 __all__ = ["extract_docx_text"]
+
+
+def _build_cli() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(
+        description=(
+            "Extract text from a DOCX file (including form-field values in tables) "
+            "and either print it to stdout or write it to an output file."
+        )
+    )
+    parser.add_argument("docx_path", type=Path, help="Path to the DOCX file to extract")
+    parser.add_argument(
+        "output_path",
+        type=Path,
+        nargs="?",
+        help="Optional path to write the extracted text. Prints to stdout if omitted.",
+    )
+    return parser
+
+
+def main(argv: list[str] | None = None) -> int:
+    args = _build_cli().parse_args(argv)
+    try:
+        text = extract_docx_text(args.docx_path, args.output_path)
+    except FileNotFoundError as exc:
+        print(f"Error: {exc}", file=sys.stderr)
+        return 1
+
+    if args.output_path is None:
+        print(text)
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
