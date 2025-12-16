@@ -186,3 +186,33 @@ def test_legacy_checkbox_within_table_includes_state():
     assert "☒" in text
     assert "Unchecked legacy box" in text
     assert "Checked legacy box" in text
+
+
+def test_unchecked_content_control_checkbox_defaults_to_empty_symbol():
+    table_xml = """
+    <w:tbl>
+      <w:tr>
+        <w:tc>
+          <w:p>
+            <w:sdt>
+              <w:sdtPr>
+                <w14:checkbox />
+              </w:sdtPr>
+              <w:sdtContent>
+                <w:p><w:r><w:t>Unchecked content control</w:t></w:r></w:p>
+              </w:sdtContent>
+            </w:sdt>
+          </w:p>
+        </w:tc>
+      </w:tr>
+    </w:tbl>
+    """
+    document_xml = DOCUMENT_TEMPLATE.format(content=table_xml)
+
+    with TemporaryDirectory() as tmp:
+        path = Path(tmp) / "unchecked_content_control.docx"
+        _write_docx(path, document_xml)
+        text = extract_docx_text(path)
+
+    assert "☐" in text
+    assert "Unchecked content control" in text

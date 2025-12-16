@@ -11,12 +11,18 @@ W14_NS = "http://schemas.microsoft.com/office/word/2010/wordml"
 
 
 def _checkbox_state(element) -> str | None:
+    checkbox_found = False
     for node in element.iter():
+        if node.tag.endswith("}checkbox"):
+            checkbox_found = True
         if node.tag.endswith("}checked"):
+            checkbox_found = True
             val = node.attrib.get(f"{{{W14_NS}}}val") or node.attrib.get(f"{{{W_NS}}}val")
             if val is None:
                 return "☒"
             return "☒" if val in {"1", "true", "on", "True"} else "☐"
+    if checkbox_found:
+        return "☐"
     return None
 
 
