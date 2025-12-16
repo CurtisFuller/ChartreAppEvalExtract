@@ -105,3 +105,40 @@ def test_extracts_legacy_form_field_values_inside_tables():
         text = extract_docx_text(path)
 
     assert "LegacyValue" in text
+
+
+def test_form_values_keep_position_within_cell():
+    table_xml = """
+    <w:tbl>
+      <w:tr>
+        <w:tc>
+          <w:p>
+            <w:r><w:t>Label:</w:t></w:r>
+            <w:sdt>
+              <w:sdtPr><w14:checkbox><w14:checked w14:val="0"/></w14:checkbox></w:sdtPr>
+              <w:sdtContent><w:p><w:r><w:t>Off</w:t></w:r></w:p></w:sdtContent>
+            </w:sdt>
+          </w:p>
+        </w:tc>
+        <w:tc>
+          <w:p>
+            <w:r><w:t>Name</w:t></w:r>
+            <w:r><w:ffData><w:textInput><w:result w:val="Alice"/></w:textInput></w:ffData></w:r>
+          </w:p>
+        </w:tc>
+      </w:tr>
+    </w:tbl>
+    """
+    document_xml = DOCUMENT_TEMPLATE.format(content=table_xml)
+
+    with TemporaryDirectory() as tmp:
+        path = Path(tmp) / "order.docx"
+        _write_docx(path, document_xml)
+        text = extract_docx_text(path)
+
+    lines = text.split("\n")
+    assert lines[0].startswith("Label:")
+    assert "☐" in lines[0]
+    assert "Off" in lines[0]
+    assert "Name" in lines[0]
+    assert "Alice" in lines[0]

@@ -10,12 +10,6 @@ W_NS = "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
 W14_NS = "http://schemas.microsoft.com/office/word/2010/wordml"
 
 
-def _iter_text(element):
-    for node in element.iter():
-        if node.tag.endswith("}t") and node.text:
-            yield node.text
-
-
 def _checkbox_state(element) -> str | None:
     for node in element.iter():
         if node.tag.endswith("}checked"):
@@ -26,33 +20,60 @@ def _checkbox_state(element) -> str | None:
     return None
 
 
-def _extract_form_field_values(cell_elem: ET.Element) -> list[str]:
-    values: list[str] = []
-    for elem in cell_elem.iter():
-        if elem.tag.endswith("}sdt"):
-            checkbox = _checkbox_state(elem)
-            if checkbox:
-                values.append(checkbox)
-                continue
-            text = "".join(_iter_text(elem)).strip()
-            if text:
-                values.append(text)
-        elif elem.tag.endswith("}ffData"):
-            for default in elem.iter():
-                if default.tag.endswith("}default"):
-                    val = default.attrib.get(f"{{{W_NS}}}val")
-                    if val:
-                        values.append(val)
-    return values
+def _legacy_form_value(ff_data: ET.Element) -> str | None:
+    for node in ff_data.iter():
+        if node.tag.endswith("}result"):
+            val = node.attrib.get(f"{{{W_NS}}}val")
+            if val:
+                return val
+        if node.tag.endswith("}default"):
+            val = node.attrib.get(f"{{{W_NS}}}val")
+            if val:
+                return val
+    return None
+
+
+def _gather_text(element: ET.Element) -> str:
+    tag = element.tag
+    if tag.endswith("}t"):
+        return element.text or ""
+    if tag.endswith("}tab"):
+        return "\t"
+    if tag.endswith("}br"):
+        return "\n"
+    if tag.endswith("}sdt"):
+        checkbox = _checkbox_state(element)
+        content = element.find(f"{{{W_NS}}}sdtContent")
+        content_text = _gather_text(content) if content is not None else ""
+        if checkbox:
+            combined = f"{checkbox} {content_text}".strip()
+            return combined
+        return content_text
+    if tag.endswith("}ffData"):
+        val = _legacy_form_value(element)
+        return val or ""
+
+    parts: list[str] = []
+    for child in element:
+        text = _gather_text(child)
+        if text:
+            parts.append(text)
+    return "".join(parts)
 
 
 def _cell_text(cell_elem: ET.Element) -> str:
-    base_text = "".join(_iter_text(cell_elem)).strip()
-    form_values = _extract_form_field_values(cell_elem)
-    extras = [val for val in form_values if val and val not in base_text]
-    parts = [base_text] if base_text else []
-    parts.extend(extras)
-    return " ".join(parts).strip()
+    parts: list[str] = []
+    for child in cell_elem:
+        if child.tag.endswith("}p"):
+            para_text = _gather_text(child).strip()
+            if para_text:
+                parts.append(para_text)
+        elif child.tag.endswith("}tbl"):
+            nested_lines: list[str] = []
+            _parse_table(child, nested_lines)
+            if nested_lines:
+                parts.append("\n".join(nested_lines))
+    return "\n".join(parts).strip()
 
 
 def _parse_table(table_elem: ET.Element, lines: list[str]) -> None:
@@ -69,7 +90,7 @@ def _parse_body(body: ET.Element, lines: list[str]) -> None:
     for child in body:
         tag = child.tag
         if tag.endswith("}p"):
-            text = "".join(_iter_text(child)).strip()
+            text = _gather_text(child).strip()
             if text:
                 lines.append(text)
         elif tag.endswith("}tbl"):
