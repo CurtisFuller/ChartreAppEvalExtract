@@ -88,7 +88,13 @@ def _gather_text(element: ET.Element) -> str:
 def _cell_text(cell_elem: ET.Element) -> str:
     parts: list[str] = []
     for child in cell_elem:
-        if child.tag.endswith("}p"):
+        if child.tag.endswith("}sdt"):
+            content = child.find(f"{{{W_NS}}}sdtContent")
+            if content is not None:
+                nested_text = _cell_text(content)
+                if nested_text:
+                    parts.append(nested_text)
+        elif child.tag.endswith("}p"):
             para_text = _gather_text(child).strip()
             if para_text:
                 parts.append(para_text)
@@ -113,7 +119,11 @@ def _parse_table(table_elem: ET.Element, lines: list[str]) -> None:
 def _parse_body(body: ET.Element, lines: list[str]) -> None:
     for child in body:
         tag = child.tag
-        if tag.endswith("}p"):
+        if tag.endswith("}sdt"):
+            content = child.find(f"{{{W_NS}}}sdtContent")
+            if content is not None:
+                _parse_body(content, lines)
+        elif tag.endswith("}p"):
             text = _gather_text(child).strip()
             if text:
                 lines.append(text)

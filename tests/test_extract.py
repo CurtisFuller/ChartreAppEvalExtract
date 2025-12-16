@@ -244,3 +244,68 @@ def test_legacy_text_result_value_stored_as_element_text():
         text = extract_docx_text(path)
 
     assert "TypedValue" in text
+
+
+def test_table_inside_body_content_control_includes_form_value():
+    document_xml = DOCUMENT_TEMPLATE.format(
+        content="""
+    <w:sdt>
+      <w:sdtContent>
+        <w:tbl>
+          <w:tr>
+            <w:tc>
+              <w:p>
+                <w:r>
+                  <w:ffData>
+                    <w:textInput>
+                      <w:result>RowValue</w:result>
+                    </w:textInput>
+                  </w:ffData>
+                </w:r>
+              </w:p>
+            </w:tc>
+          </w:tr>
+        </w:tbl>
+      </w:sdtContent>
+    </w:sdt>
+    """
+    )
+
+    with TemporaryDirectory() as tmp:
+        path = Path(tmp) / "body_sdt_table.docx"
+        _write_docx(path, document_xml)
+        text = extract_docx_text(path)
+
+    assert "RowValue" in text
+
+
+def test_cell_content_control_wraps_form_value():
+    table_xml = """
+    <w:tbl>
+      <w:tr>
+        <w:tc>
+          <w:sdt>
+            <w:sdtContent>
+              <w:p>
+                <w:r>
+                  <w:ffData>
+                    <w:textInput>
+                      <w:default w:val="Nested" />
+                    </w:textInput>
+                  </w:ffData>
+                </w:r>
+              </w:p>
+            </w:sdtContent>
+          </w:sdt>
+        </w:tc>
+      </w:tr>
+    </w:tbl>
+    """
+    document_xml = DOCUMENT_TEMPLATE.format(content=table_xml)
+
+    with TemporaryDirectory() as tmp:
+        path = Path(tmp) / "cell_sdt.docx"
+        _write_docx(path, document_xml)
+        text = extract_docx_text(path)
+
+    assert "Nested" in text
